@@ -9,7 +9,7 @@ count warner, when the count greater than limit, it will tigger a warn event
 ```go
 w := warner.NewWarner(time.Second, 10)
 w.ResetOnWarn = true
-w.On(func(key string, createdAt int64) {
+w.On(func(key string, c Count) {
   fmt.Println(key)
 })
 w.Inc("abcd", 1)

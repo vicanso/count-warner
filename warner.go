@@ -35,14 +35,13 @@ type (
 		listerns    []Listener
 	}
 	// Listener warner listener
-	Listener func(key string, createdAt int64)
+	Listener func(key string, c Count)
 )
 
 // NewWarner create a new warner
 func NewWarner(duration time.Duration, max int) *Warner {
 	return &Warner{
 		m:        make(map[string]*Count),
-		mu:       sync.Mutex{},
 		listerns: make([]Listener, 0),
 		Duration: duration,
 		Max:      max,
@@ -64,7 +63,7 @@ func (w *Warner) Inc(key string, value int) {
 	c.Value += value
 	if c.Value > w.Max {
 		for _, fn := range w.listerns {
-			fn(key, c.CreatedAt)
+			fn(key, *c)
 		}
 		if w.ResetOnWarn {
 			delete(w.m, key)

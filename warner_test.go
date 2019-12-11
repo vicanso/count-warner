@@ -28,8 +28,9 @@ func TestWarner(t *testing.T) {
 	warner.ResetOnWarn = true
 	key := "abcd"
 	done := false
-	warner.On(func(k string, createdAt int64) {
+	warner.On(func(k string, c Count) {
 		done = true
+		assert.Equal(max+1, c.Value)
 	})
 	for index := 0; index < max+1; index++ {
 		warner.Inc(key, 1)
