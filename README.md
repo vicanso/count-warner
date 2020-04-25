@@ -2,7 +2,7 @@
 
 [![Build Status](https://img.shields.io/travis/vicanso/count-warner.svg?label=linux+build)](https://travis-ci.org/vicanso/count-warner)
 
-count warner, when the count greater than limit, it will tigger a warn event
+Count warner, when the count greater than limit, it will tigger a warn event
 
 ## API
 
