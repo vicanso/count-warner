@@ -25,8 +25,8 @@ type (
 		CreatedAt int64
 		Value     int
 	}
-	// Warner warner
-	Warner struct {
+	// warner warner
+	warner struct {
 		Duration    time.Duration
 		Max         int
 		ResetOnWarn bool
@@ -39,8 +39,8 @@ type (
 )
 
 // NewWarner create a new warner
-func NewWarner(duration time.Duration, max int) *Warner {
-	return &Warner{
+func NewWarner(duration time.Duration, max int) *warner {
+	return &warner{
 		m:        make(map[string]*Count),
 		listerns: make([]Listener, 0),
 		Duration: duration,
@@ -49,7 +49,7 @@ func NewWarner(duration time.Duration, max int) *Warner {
 }
 
 // Inc increase or decrease count value
-func (w *Warner) Inc(key string, value int) {
+func (w *warner) Inc(key string, value int) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	c, ok := w.m[key]
@@ -72,14 +72,14 @@ func (w *Warner) Inc(key string, value int) {
 }
 
 // Reset reset the count value
-func (w *Warner) Reset(key string) {
+func (w *warner) Reset(key string) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	delete(w.m, key)
 }
 
 // ClearExpired clear expired count
-func (w *Warner) ClearExpired() {
+func (w *warner) ClearExpired() {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	m := make(map[string]*Count)
@@ -96,6 +96,6 @@ func (w *Warner) ClearExpired() {
 }
 
 // On on warn event
-func (w *Warner) On(ln Listener) {
+func (w *warner) On(ln Listener) {
 	w.listerns = append(w.listerns, ln)
 }
