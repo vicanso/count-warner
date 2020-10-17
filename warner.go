@@ -22,7 +22,7 @@ import (
 type (
 	// Count count
 	Count struct {
-		CreatedAt int64
+		CreatedAt time.Time
 		Value     int
 	}
 	// warner warner
@@ -53,8 +53,8 @@ func (w *warner) Inc(key string, value int) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	c, ok := w.m[key]
-	now := time.Now().UnixNano()
-	if !ok || c.CreatedAt+w.Duration.Nanoseconds() < now {
+	now := time.Now()
+	if !ok || c.CreatedAt.Add(w.Duration).Before(now) {
 		c = &Count{
 			CreatedAt: now,
 		}
@@ -83,11 +83,10 @@ func (w *warner) ClearExpired() {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	m := make(map[string]*Count)
-	now := time.Now().UnixNano()
-	d := w.Duration.Nanoseconds()
+	now := time.Now()
 	for k, c := range w.m {
 		// 只保留未过期的
-		if c.CreatedAt+d > now {
+		if c.CreatedAt.Add(w.Duration).After(now) {
 			m[k] = c
 		}
 	}
