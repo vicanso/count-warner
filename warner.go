@@ -17,84 +17,94 @@ package warner
 import (
 	"sync"
 	"time"
+
+	"go.uber.org/atomic"
 )
 
 type (
 	// Count count
 	Count struct {
-		CreatedAt time.Time
-		Value     int
+		createdAt time.Time
+		value     *atomic.Int32
+		emitted   *atomic.Bool
 	}
 	// warner warner
 	warner struct {
 		Duration    time.Duration
 		Max         int
 		ResetOnWarn bool
-		mu          sync.Mutex
-		m           map[string]*Count
+		m           *sync.Map
 		listerns    []Listener
 	}
 	// Listener warner listener
-	Listener func(key string, c Count)
+	Listener func(key string, count int)
 )
 
-// NewWarner create a new warner
+// NewWarner returns a new warner
 func NewWarner(duration time.Duration, max int) *warner {
 	return &warner{
-		m:        make(map[string]*Count),
+		m:        &sync.Map{},
 		listerns: make([]Listener, 0),
 		Duration: duration,
 		Max:      max,
 	}
 }
 
-// Inc increase or decrease count value
+// Inc value for the key, value can be < 0
 func (w *warner) Inc(key string, value int) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	c, ok := w.m[key]
+	// warner并不需要精准的判断，
+	// 因此如果并发时可能会覆盖数据，
+	// 对整体的告警影响不大
+	c := w.get(key)
 	now := time.Now()
-	if !ok || c.CreatedAt.Add(w.Duration).Before(now) {
+	if c != nil && c.createdAt.Add(w.Duration).Before(now) {
+		c = nil
+	}
+	if c == nil {
 		c = &Count{
-			CreatedAt: now,
+			createdAt: now,
+			value:     atomic.NewInt32(0),
+			emitted:   atomic.NewBool(false),
 		}
-		w.m[key] = c
+		w.m.Store(key, c)
 	}
-	c.Value += value
-	if c.Value > w.Max {
+	count := c.value.Add(int32(value))
+	// 仅触发一次
+	if count > int32(w.Max) && !c.emitted.Swap(true) {
 		for _, fn := range w.listerns {
-			fn(key, *c)
+			fn(key, int(count))
 		}
+		// 如果设置了告警后重置
 		if w.ResetOnWarn {
-			delete(w.m, key)
+			c.value.Store(0)
+			c.emitted.Store(false)
 		}
 	}
 }
 
-// Reset reset the count value
-func (w *warner) Reset(key string) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	delete(w.m, key)
-}
-
-// ClearExpired clear expired count
-func (w *warner) ClearExpired() {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	m := make(map[string]*Count)
-	now := time.Now()
-	for k, c := range w.m {
-		// 只保留未过期的
-		if c.CreatedAt.Add(w.Duration).After(now) {
-			m[k] = c
-		}
-	}
-	// 更换map
-	w.m = m
-}
-
-// On on warn event
+// On adds a listener for warner
 func (w *warner) On(ln Listener) {
 	w.listerns = append(w.listerns, ln)
+}
+
+// ClearExpired clears the expired key
+func (w *warner) ClearExpired() {
+	now := time.Now()
+	w.m.Range(func(key, value interface{}) bool {
+		c, ok := value.(*Count)
+		if ok && c.createdAt.Add(w.Duration).Before(now) {
+			w.m.Delete(key)
+		}
+		return true
+	})
+}
+
+// get get count value
+func (w *warner) get(key string) *Count {
+	v, ok := w.m.Load(key)
+	if !ok {
+		return nil
+	}
+	c, _ := v.(*Count)
+	return c
 }
